@@ -1,13 +1,36 @@
 # 🚀 BARK INFINITY with Evaluating AI-Generated Audio Quality 🎶
+### Evaluating AI-Generated Audio Quality with Python
 
-_(This is no longer just a command line wrapper...)_
+This code is an augmentation of the original script BARK INFINITY script, an AI-based text-to-voice model that generates an audio file. The goal of this script is to evaluate the output of the model, reject unsatisfactory samples, and render the final result. The function generate_audio_with_zcr_check attempts to create an audio file that meets specific quality criteria by employing multiple evaluation metrics, such as Zero Crossing Rate (ZCR), Spectral Contrast, and Bass Energy.
+
+
+[Example of unacceptable samples](/github_media/audio_43.40_bad.wav)
+
+
+The script continuously executes the loop while attempts < max_attempts: until the number of attempts reaches the maximum specified by the max_attempts parameter. During each iteration, the function tries to generate the audio and verifies if it surpasses the specified thresholds.
+
+Within the loop, the conditional if attempts > 0 and base is not None: checks if this is not the first attempt (attempts > 0) and if a valid base model token is supplied (base is not None). If both conditions hold true, it resets the base model token by setting base = None. This action allows subsequent calls to generate_audio to employ a new base model token, potentially generating a different audio sample that could pass the thresholds. If the base token remains unchanged, the function might continuously generate the same audio sample, repeatedly failing the thresholds.
+
+ZCR is a feature employed in audio signal processing and speech recognition, representing the rate at which the audio signal changes its sign or crosses the zero-amplitude level. In speech signals, a higher ZCR typically signifies unvoiced or fricative sounds (such as 's' or 'f'), while a lower ZCR is linked to voiced sounds (like vowels). ZCR helps differentiate various types of sounds and evaluate synthesized speech quality.
+
+Spectral Contrast measures the difference between peaks (high energy) and valleys (low energy) in an audio signal's frequency spectrum. It captures the relative prominence of distinct frequency components, offering information about the spectral content's uniqueness. In speech and audio processing, spectral contrast aids in assessing the intelligibility and quality of synthesized speech by examining the energy distribution across the frequency spectrum.
+
+Bass Energy denotes the average energy in an audio signal's lower frequency range, typically associated with bass sounds. In speech signals, bass energy captures low-frequency components, such as a speaker's voice's fundamental frequency or the energy of voiced sounds. Analyzing bass energy proves useful in evaluating synthesized speech quality and naturalness, as it contributes to the audio signal's overall perception.
+
+To install the additional packages required
+
+```python
+pip install librosa bark scipy soundfile
+```
 
 April 22: The main bark repo just implemented small model support, so if just want that you don't need use this fork. If I can find time this weekend I'll unhack the way I did and use their parameters.
 
 April 25: I will update this with the main Bark repo Tuesday evening (which had a speed increase over the weekend). There's probably going to be two files, a light bark wrapper which you can just pop into the regular Bark repo as a pure wrapper, so it never gets out of date. And another file that requires forking this whole repo and installing it, with more options and power for how to build longer clips especially.
+
 **Now it's BARK INFINITY!** 🎉
 
-## 🌟 Main Features 🌟
+
+### 🌟 Main Features 🌟
 
 ### 1. INFINITY VOICES 🔊🌈
 Discover cool new voices and reuse them. Performers, musicians, sound effects, two party dialog scenes. Save and share them. Every audio clip saves a speaker.npz file with the voice. To reuse a voice, move the generated speaker.npz file (named the same as the .wav file) to the "prompts" directory inside "bark" where all the other .npz files are.
