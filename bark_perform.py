@@ -1,14 +1,19 @@
 import argparse
+import string
 import numpy as np
+import librosa
 from bark import SAMPLE_RATE, generate_audio, preload_models
 import os
 import datetime
 import soundfile as sf
 import re
 from collections import defaultdict, namedtuple
+from scipy import signal
+from scipy.io import wavfile
+import random
 
 FileData = namedtuple("FileData", ["filename", "name", "desc"])
-
+sample_rate = 24000 
 
 
 SUPPORTED_LANGS = [
@@ -27,7 +32,10 @@ SUPPORTED_LANGS = [
     ("Chinese", "zh"),
 ]
 
-
+def random_name(length=10):
+    # Generate a random string of the specified length
+    result = ''.join(random.choices(string.ascii_letters, k=length))
+    return result + '.wav'
 
 def read_npz_files(directory):
     return [f for f in os.listdir(directory) if f.endswith(".npz")]
@@ -108,9 +116,68 @@ def split_text(text, split_words=0, split_lines=0):
 def save_audio_to_file(filepath, audio_array, sample_rate=24000, format='WAV', subtype='PCM_16', output_dir=None):
     sf.write(filepath, audio_array, sample_rate, format=format, subtype=subtype)
     print(f"Saved audio to {filepath}")
+    
+def zero_crossing_rate(audio, frame_length=1024, hop_length=512):
+    zero_crossings = np.sum(np.abs(np.diff(np.sign(audio))) / 2)
+    total_frames = 1 + int((len(audio) - frame_length) / hop_length)
+    return zero_crossings / total_frames
+    
+def compute_spectral_contrast(audio_data, sample_rate, n_bands=6, fmin=200.0):
+    spectral_contrast = librosa.feature.spectral_contrast(y=audio_data, sr=sample_rate, n_bands=n_bands, fmin=fmin)
+    return np.mean(spectral_contrast)
+    
+def compute_average_bass_energy(audio_data, sample_rate, max_bass_freq=250):
+    stft = librosa.stft(audio_data)
+    power_spectrogram = np.abs(stft)**2
+    frequencies = librosa.fft_frequencies(sr=sample_rate, n_fft=stft.shape[0])
+    bass_mask = frequencies <= max_bass_freq
+    bass_energy = power_spectrogram[np.ix_(bass_mask, np.arange(power_spectrogram.shape[1]))].mean()
+    return bass_energy
+    
+def generate_audio_with_zcr_check(text, history_prompt, sample_rate, zcr_threshold=80, spectral_threshold=23, bass_energy_threshold=150, max_attempts=10, **kwargs):
+    attempts = 0
+    output_directory = "output_array"
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+
+    base = kwargs.pop("base", None)
+
+    while attempts < max_attempts:
+        if attempts > 0 and base is not None:
+            # Reset the base model token
+            print(f"Reset the base model token Regenerating...")
+            base = None
+        
+        audio_array, x = generate_audio(text, history_prompt, base=base, **kwargs)
+        zcr = zero_crossing_rate(audio_array)
+        spectral_contrast = compute_spectral_contrast(audio_array, sample_rate)
+        bass_energy = compute_average_bass_energy(audio_array, sample_rate)
+        print(f"Attempt {attempts + 1}: ZCR = {zcr}, Spectral Contrast = {spectral_contrast:.2f}, Bass Energy = {bass_energy:.2f}")
+      
+        # Save the audio array to the output_array directory with a random name for debugging 
+        #output_file = os.path.join(output_directory, f"audio_{zcr:.2f}_sc{spectral_contrast:.2f}_be{bass_energy:.2f}.wav")
+        #wavfile.write(output_file, sample_rate, audio_array)
+        #print(f"Saved audio array to {output_file}")
+        
+        if zcr < zcr_threshold and spectral_contrast < spectral_threshold and bass_energy < bass_energy_threshold:
+            print(f"Audio passed ZCR, Spectral Contrast, and Bass Energy thresholds. No need to regenerate.")
+            break
+        else:
+            print(f"Audio failed ZCR, Spectral Contrast, and/or Bass Energy thresholds. Regenerating...")
+
+        attempts += 1
+
+    if attempts == max_attempts:
+        print("Reached maximum attempts. Returning the last generated audio.")
+    
+    return audio_array, x, zcr, spectral_contrast, bass_energy
 
 
-def gen_and_save_audio(text_prompt, history_prompt=None, text_temp=0.7, waveform_temp=0.7, filename="", output_dir="bark_samples", split_by_words=0, split_by_lines=0, stable_mode=False, confused_travolta_mode=False, iteration=1):
+
+
+
+
+def gen_and_save_audio(text_prompt, history_prompt=None, text_temp=0.7, waveform_temp=0.7, filename="", output_dir="bark_samples", split_by_words=0, split_by_lines=0, stable_mode=False, confused_travolta_mode=False, iteration=1, zcr_threshold=70):
     def generate_unique_filename(base_filename):
         name, ext = os.path.splitext(base_filename)
         unique_filename = base_filename
@@ -142,7 +209,10 @@ def gen_and_save_audio(text_prompt, history_prompt=None, text_temp=0.7, waveform
         if longer_than_14_seconds:
             print(f"Text Prompt could be too long, might want to try a shorter one or try splitting tighter.")
 
-        audio_array, x = generate_audio(chunk, history_prompt, text_temp=text_temp, waveform_temp=waveform_temp, base=base, confused_travolta_mode=confused_travolta_mode)
+        audio_array, x, zcr, spectral_contrast, bass_energy = generate_audio_with_zcr_check(chunk, history_prompt, sample_rate, zcr_threshold=zcr_threshold, text_temp=text_temp, waveform_temp=waveform_temp, base=base, confused_travolta_mode=confused_travolta_mode)
+
+        print(f"Zero-crossing rate: {zcr}")
+        
         if saveit is True and npzbase is None:
             npzbase = x
         if stable_mode:
@@ -263,32 +333,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="""
         (This grew into a bit more than a BARK CLI wrapper.)
-
-        WELCOME TO BARK INFINITY  
-
-        INFINITY VOICES
-            Discover cool new voices, save them, share them.
-            Every audio clip saves a speaker.npz file with voice.
-            To reuse a voice, move the generated speaker.npz file (named the same as the .wav file) 
-                to the "prompts" directory inside "bark" where all the other .npz files are.
-            
-        INFINITY LENGTH
-            Any length prompt and audio clips.
-            Sometimes the final result is seemless, sometimes it's stable. (But usually not both!)
-
-        CONFUSED TRAVOLTA MODE
-            Not super useful but very fun.
-
-        --use_smaller_models for faster generation even on low VRAM gpus.
-        
-        install this first: pip install soundfile
-
-        Example: python bark_perform.py --text_prompt "It is a mistake to think you can solve any major problems just with potatoes... (and full page more of text)" --split_by_words 35
-
-        BARK INFINITY is possible because Bark is such an amazingly simple and powerful model that even I can could poke around easily.
-
-        For music I recommend using the --split_by_lines and making sure you use a multiline string as input. 
-        You'll generally get better results if you manually split your text, which I neglected to provide an easy way to do (seperate token?).
+you manually split your text, which I neglected to provide an easy way to do (seperate token?).
 
         """, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--text_prompt", help="Text prompt. If not provided, a set of default prompts will be used defined in this file.")
