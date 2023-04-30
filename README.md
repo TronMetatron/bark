@@ -1,4 +1,4 @@
-# 🚀 BARK INFINITY 🎶
+# 🚀 BARK INFINITY with Evaluating AI-Generated Audio Quality 🎶
 
 _(This is no longer just a command line wrapper...)_
 
