@@ -28,9 +28,6 @@ The voice may change in tenor and type during the audio generation process. This
 
 To improve the performance and make the function more suitable for various voice types, the model would need to be updated to a larger and more sophisticated one. A better model could potentially deliver more consistent results in terms of volume levels, tenor, and voice type while maintaining intelligibility and complying with the specified thresholds.
 
-April 22: The main bark repo just implemented small model support, so if just want that you don't need use this fork. If I can find time this weekend I'll unhack the way I did and use their parameters.
-
-April 25: I will update this with the main Bark repo Tuesday evening (which had a speed increase over the weekend). There's probably going to be two files, a light bark wrapper which you can just pop into the regular Bark repo as a pure wrapper, so it never gets out of date. And another file that requires forking this whole repo and installing it, with more options and power for how to build longer clips especially.
 
 **Now it's BARK INFINITY!** 🎉
 
