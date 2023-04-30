@@ -3,10 +3,6 @@
 
 This code is an augmentation of the original script BARK INFINITY script, an AI-based text-to-voice model that generates an audio file. The goal of this script is to evaluate the output of the model, reject unsatisfactory samples, and render the final result. The function generate_audio_with_zcr_check attempts to create an audio file that meets specific quality criteria by employing multiple evaluation metrics, such as Zero Crossing Rate (ZCR), Spectral Contrast, and Bass Energy.
 
-
-[Example of unacceptable samples](/github_media/audio_43.40_bad.wav)
-
-
 The script continuously executes the loop while attempts < max_attempts: until the number of attempts reaches the maximum specified by the max_attempts parameter. During each iteration, the function tries to generate the audio and verifies if it surpasses the specified thresholds.
 
 Within the loop, the conditional if attempts > 0 and base is not None: checks if this is not the first attempt (attempts > 0) and if a valid base model token is supplied (base is not None). If both conditions hold true, it resets the base model token by setting base = None. This action allows subsequent calls to generate_audio to employ a new base model token, potentially generating a different audio sample that could pass the thresholds. If the base token remains unchanged, the function might continuously generate the same audio sample, repeatedly failing the thresholds.
